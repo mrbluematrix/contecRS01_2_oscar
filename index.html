@@ -119,6 +119,17 @@ dl.stats dd { margin: 0; }
 #clock-status.ok { color: var(--ok); font-weight: 700; }
 #clock-status.bad { color: var(--pulse); font-weight: 700; }
 #clock-detail { margin: .3rem 0 0; color: var(--ink-soft); font-size: .95rem; word-break: break-word; }
+
+.overview { cursor: crosshair; }
+.detail { margin: 1.4rem 0 0; }
+.detail h4 { font-size: 1.1rem; margin: 0 0 .2rem; }
+.detail-hint { margin: 0 0 .7rem; color: var(--ink-soft); font-size: .95rem; max-width: 40rem; }
+.detail-ctl { display: flex; flex-wrap: wrap; gap: .5rem .8rem; align-items: center; margin-bottom: .5rem; }
+.detail-ctl label { display: inline-flex; gap: .4rem; align-items: center; }
+.detail-ctl select { font: inherit; color: var(--ink); background: var(--sheet); border: 2px solid var(--grid); border-radius: 4px; padding: .25rem .4rem; }
+.btn.small { padding: .3rem .75rem; font-size: .95rem; }
+.detail-time { margin: .2rem 0 .3rem; font-weight: 700; }
+.detail-sum { margin: .4rem 0 0; color: var(--ink-soft); }
 </style>
 </head>
 <body>
@@ -345,7 +356,7 @@ dl.stats dd { margin: 0; }
 
   function parseSegs(segs, perSeg) {
     segs.sort((a, b) => segNum(a.name) - segNum(b.name));
-    const parts = []; let maxIdx = -1, fmin = Infinity, fmax = -Infinity; const notes = [];
+    const recs = []; let maxIdx = -1, fmin = Infinity, fmax = -Infinity; const notes = [];
     for (const s of segs) {
       const body = new Uint8Array(s.buf).subarray(SEG_HEADER);
       const count = Math.floor(body.length / RECORD);
@@ -359,14 +370,19 @@ dl.stats dd { margin: 0; }
         if (body[p] !== 0xff || body[p + 1] !== 0xff) { notes.push(`${s.name}: data misaligned from second ${i}; the rest of the file was skipped.`); break; }
         const idx = dv.getUint16(p + 2, true) + off - 1;
         if (idx < 0) continue;
-        parts.push(idx, body[p + 105], body[p + 104]);
+        recs.push(body, p, idx);
         if (idx > maxIdx) maxIdx = idx;
         for (let k = 0; k < 50; k++) { const f = dv.getUint16(p + 4 + 2 * k, true); if (f < fmin) fmin = f; if (f > fmax) fmax = f; }
       }
     }
     const spo2 = new Int16Array(maxIdx + 1).fill(-1), pr = new Int16Array(maxIdx + 1).fill(-1);
-    for (let j = 0; j < parts.length; j += 3) { spo2[parts[j]] = parts[j + 1]; pr[parts[j]] = parts[j + 2]; }
-    return { spo2, pr, recorded: parts.length / 3, fmin, fmax, notes };
+    const pleth = new Uint8Array((maxIdx + 1) * 100);
+    for (let j = 0; j < recs.length; j += 3) {
+      const body = recs[j], p = recs[j + 1], idx = recs[j + 2];
+      spo2[idx] = body[p + 105]; pr[idx] = body[p + 104];
+      pleth.set(body.subarray(p + 106, p + 206), idx * 100);
+    }
+    return { spo2, pr, pleth, recorded: recs.length / 3, fmin, fmax, notes };
   }
 
   /* ---------- Grouping and analysis ---------- */
@@ -404,14 +420,14 @@ dl.stats dd { margin: 0; }
   function analyse(start, d, hdName) {
     const { spo2, pr } = d;
     const ok = i => spo2[i] >= 50 && spo2[i] <= 100 && pr[i] >= 20 && pr[i] <= 250;
-    let first = -1, last = -1, nv = 0, sSum = 0, sMin = 101, below90 = 0, pSum = 0, pMin = 999, pMax = 0;
+    let first = -1, last = -1, nv = 0, sSum = 0, sMin = 101, sMinIdx = -1, below90 = 0, pSum = 0, pMin = 999, pMax = 0;
     for (let i = 0; i < spo2.length; i++) {
       if (!ok(i)) continue;
       if (first < 0) first = i; last = i; nv++;
-      sSum += spo2[i]; if (spo2[i] < sMin) sMin = spo2[i]; if (spo2[i] < 90) below90++;
+      sSum += spo2[i]; if (spo2[i] < sMin) { sMin = spo2[i]; sMinIdx = i; } if (spo2[i] < 90) below90++;
       pSum += pr[i]; if (pr[i] < pMin) pMin = pr[i]; if (pr[i] > pMax) pMax = pr[i];
     }
-    return { start, hdName, ...d, ok, first, last, nv, sMean: sSum / nv, sMin, below90, pMean: pSum / nv, pMin, pMax };
+    return { start, hdName, ...d, ok, first, last, nv, sMean: sSum / nv, sMin, sMinIdx, below90, pMean: pSum / nv, pMin, pMax };
   }
 
   /* ---------- Chart ---------- */
@@ -436,6 +452,7 @@ dl.stats dd { margin: 0; }
     let grid = "";
     for (const v of [70, 80, 90, 100]) grid += `<line x1="${L}" x2="${W - R}" y1="${y(S, v)}" y2="${y(S, v)}" stroke="var(--grid)" ${v === 90 ? 'stroke-dasharray="4 4"' : ""}/><text x="${L - 6}" y="${y(S, v) + 4}" text-anchor="end">${v}</text>`;
     for (const v of [40, 90, 140]) grid += `<line x1="${L}" x2="${W - R}" y1="${y(P, v)}" y2="${y(P, v)}" stroke="var(--grid)"/><text x="${L - 6}" y="${y(P, v) + 4}" text-anchor="end">${v}</text>`;
+    n.geom = { W, L, plotW, span, top: S.top, bottom: P.top + P.h };
     const t0 = addS(n.start, n.first);
     const step = span > 4 * 3600 ? 3600 : span > 3600 ? 1800 : span > 600 ? 300 : 60;
     let tick = Math.ceil((t0.getTime() / 1000 - t0.getTimezoneOffset() * 60) / step) * step - (t0.getTime() / 1000 - t0.getTimezoneOffset() * 60);
@@ -443,8 +460,9 @@ dl.stats dd { margin: 0; }
       const xx = x(n.first + tick);
       grid += `<line x1="${xx}" x2="${xx}" y1="${S.top}" y2="${P.top + P.h}" stroke="var(--grid)" stroke-width=".6"/><text x="${xx}" y="${H - 8}" text-anchor="middle">${hhmm(addS(t0, tick))}</text>`;
     }
-    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="SpO2 and pulse over the recording" font-size="12" fill="var(--ink-soft)" font-family="inherit">
+    return `<svg class="overview" viewBox="0 0 ${W} ${H}" role="img" aria-label="SpO2 and pulse over the recording; click to show the pulse wave at that moment" font-size="12" fill="var(--ink-soft)" font-family="inherit">
       ${grid}
+      <rect class="win" x="${L}" y="${S.top}" width="0" height="${P.top + P.h - S.top}" fill="var(--spo2)" fill-opacity=".15" stroke="var(--spo2)" stroke-width="1"/>
       <path d="${sPath}" fill="none" stroke="var(--spo2)" stroke-width="1.6" stroke-linejoin="round"/>
       <path d="${pPath}" fill="none" stroke="var(--pulse)" stroke-width="1.4" stroke-linejoin="round"/>
     </svg>`;
@@ -472,6 +490,25 @@ dl.stats dd { margin: 0; }
     const vStart = addS(n.start, n.first), vEnd = addS(n.start, n.last);
     html += `<div class="chart">${chart(n)}</div>
       <p class="legend"><span class="l-spo2"><b>SpO2 (%), minimum per point</b></span><span class="l-pulse"><b>Pulse (bpm)</b></span></p>
+      <div class="detail">
+        <h4>Pulse wave</h4>
+        <p class="detail-hint">Click the chart above to look at the pulse wave (pleth) at that moment. A clean, regular wave means the SpO2 reading can be trusted; a flat or chaotic one usually means the finger moved.</p>
+        <div class="detail-ctl">
+          <button class="btn small" type="button" data-move="-1">‹ Earlier</button>
+          <label>Window
+            <select>
+              <option value="10">10 s</option>
+              <option value="30" selected>30 s</option>
+              <option value="120">2 min</option>
+            </select>
+          </label>
+          <button class="btn small" type="button" data-move="1">Later ›</button>
+          <button class="btn small" type="button" data-go="min">Lowest SpO2</button>
+        </div>
+        <p class="detail-time"></p>
+        <div class="chart pleth"></div>
+        <p class="detail-sum"></p>
+      </div>
       <dl class="stats">
         <dt>Valid readings</dt><dd>${dur(n.nv)}, from ${hhmmss(vStart)} to ${hhmmss(vEnd)}</dd>
         <dt>SpO2</dt><dd>mean ${num(n.sMean)}%, minimum ${n.sMin}%</dd>
@@ -481,9 +518,85 @@ dl.stats dd { margin: 0; }
       <button class="btn primary" type="button">Download for OSCAR (.zip)</button>
       <p class="status" role="status"></p>`;
     sec.innerHTML = html;
-    const btn = $("button", sec), status = $(".status", sec);
+    const btn = $("button.primary", sec), status = $(".status", sec);
     btn.addEventListener("click", () => download(n, btn, status));
     results.appendChild(sec);
+    setupDetail(n, sec);
+  }
+
+  /* ---------- Pulse wave detail ---------- */
+  function setupDetail(n, sec) {
+    const ov = $("svg.overview", sec), win = $("rect.win", ov), sel = $(".detail select", sec);
+    const box = $(".chart.pleth", sec), tlabel = $(".detail-time", sec), sum = $(".detail-sum", sec);
+    let center = n.sMinIdx >= 0 ? n.sMinIdx : n.first;
+    const g = n.geom;
+    function draw() {
+      const w = +sel.value;
+      const lo = n.first, hi = Math.max(n.first, n.last + 1 - w);
+      const s0 = Math.min(hi, Math.max(lo, Math.round(center - w / 2)));
+      center = s0 + w / 2;
+      const wx = g.L + ((s0 - n.first) / Math.max(1, g.span - 1)) * g.plotW;
+      win.setAttribute("x", wx);
+      win.setAttribute("width", Math.max(2, Math.min(g.L + g.plotW - wx, (w / g.span) * g.plotW)));
+      box.innerHTML = plethSvg(n, s0, w);
+      const t1 = addS(n.start, s0), t2 = addS(n.start, s0 + w);
+      tlabel.textContent = `${hhmmss(t1)} to ${hhmmss(t2)}`;
+      let sLo = 999, sHi = 0, pLo = 999, pHi = 0, c = 0;
+      for (let i = s0; i < s0 + w; i++) if (n.ok(i)) {
+        c++; sLo = Math.min(sLo, n.spo2[i]); sHi = Math.max(sHi, n.spo2[i]); pLo = Math.min(pLo, n.pr[i]); pHi = Math.max(pHi, n.pr[i]);
+      }
+      const rng = (a, b) => a === b ? `${a}` : `${a} to ${b}`;
+      sum.textContent = c ? `In this window: SpO2 ${rng(sLo, sHi)}%, pulse ${rng(pLo, pHi)} bpm${c < w ? `, no reading for ${w - c} s (grey)` : ""}.`
+                          : "No valid reading in this window.";
+    }
+    ov.addEventListener("click", e => {
+      const r = ov.getBoundingClientRect();
+      if (!r.width) return;
+      const xv = ((e.clientX - r.left) / r.width) * g.W;
+      center = n.first + Math.min(1, Math.max(0, (xv - g.L) / g.plotW)) * (g.span - 1);
+      draw();
+    });
+    sec.querySelectorAll("[data-move]").forEach(b => b.addEventListener("click", () => {
+      center += +b.dataset.move * +sel.value * 0.8; draw();
+    }));
+    $("[data-go]", sec).addEventListener("click", () => { center = n.sMinIdx; draw(); });
+    sel.addEventListener("change", draw);
+    draw();
+  }
+
+  function plethSvg(n, s0, w) {
+    const W = 800, L = 44, R = 10, top = 10, h = 170, plotW = W - L - R, H = top + h + 26;
+    const total = w * 100;
+    let vmin = 255, vmax = 0;
+    for (let i = s0; i < s0 + w; i++) if (n.ok(i)) for (let k = i * 100; k < i * 100 + 100; k++) { const v = n.pleth[k]; if (v < vmin) vmin = v; if (v > vmax) vmax = v; }
+    if (vmax <= vmin) { vmin = 0; vmax = 127; }
+    const padV = (vmax - vmin) * 0.08; vmin -= padV; vmax += padV;
+    const x = j => L + (j / (total - 1)) * plotW;
+    const y = v => top + h - ((v - vmin) / (vmax - vmin)) * h;
+    let path = "", pen = false, shade = "", grid = "";
+    const stepPx = Math.max(1, Math.floor(total / (plotW * 2)));
+    for (let sI = 0; sI < w; sI++) {
+      const i = s0 + sI;
+      if (!n.ok(i)) {
+        shade += `<rect x="${x(sI * 100).toFixed(1)}" y="${top}" width="${(plotW / w).toFixed(2)}" height="${h}" fill="var(--grid)" fill-opacity=".55"/>`;
+        pen = false; continue;
+      }
+      for (let k = 0; k < 100; k += stepPx) {
+        const j = sI * 100 + k;
+        path += `${pen ? "L" : "M"}${x(j).toFixed(1)} ${y(n.pleth[i * 100 + k]).toFixed(1)}`; pen = true;
+      }
+    }
+    const lab = w <= 10 ? 2 : w <= 30 ? 5 : 20;
+    for (let sI = 0; sI <= w; sI++) {
+      const xx = L + (sI / w) * plotW;
+      const major = (s0 + sI) % lab === 0;
+      grid += `<line x1="${xx.toFixed(1)}" x2="${xx.toFixed(1)}" y1="${top}" y2="${top + h}" stroke="var(--grid)" stroke-width="${major ? 1 : 0.4}"/>`;
+      if (major && sI < w) grid += `<text x="${xx.toFixed(1)}" y="${H - 8}" text-anchor="middle">${hhmmss(addS(n.start, s0 + sI))}</text>`;
+    }
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Pulse wave from ${hhmmss(addS(n.start, s0))}, ${w} seconds" font-size="12" fill="var(--ink-soft)" font-family="inherit">
+      ${shade}${grid}<rect x="${L}" y="${top}" width="${plotW}" height="${h}" fill="none" stroke="var(--grid)"/>
+      <path d="${path}" fill="none" stroke="var(--ink)" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>`;
   }
 
   /* ---------- Output files ---------- */
