@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RS01 tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #EEF2F4;
+  --sheet: #F8FAFB;
+  --ink: #1B2A3A;
+  --ink-soft: #4F6070;
+  --grid: #CBD7DF;
+  --spo2: #1F6F8B;
+  --pulse: #A8394A;
+  --warn: #8A5A12;
+  --warn-bg: #F6ECD9;
+  --focus: #1F6F8B; --ok: #2E6B3F;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111A22; --sheet: #17222C; --ink: #DCE6EC; --ink-soft: #9AABB8;
+    --grid: #2B3B48; --spo2: #63B6D1; --pulse: #E27D8B; --warn: #E9B866; --warn-bg: #2E2616;
+    --focus: #63B6D1; --ok: #7CC891; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111A22; --sheet: #17222C; --ink: #DCE6EC; --ink-soft: #9AABB8;
+  --grid: #2B3B48; --spo2: #63B6D1; --pulse: #E27D8B; --warn: #E9B866; --warn-bg: #2E2616;
+  --focus: #63B6D1; --ok: #7CC891; color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 1.0625rem; line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+main { max-width: 52rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 .6rem; font-weight: 700; letter-spacing: -.01em; }
+.lead { margin: 0 0 1.8rem; max-width: 38rem; color: var(--ink-soft); }
+
+.drop {
+  position: relative; display: grid; place-items: center; text-align: center;
+  min-height: 13rem; padding: 2rem 1.25rem; border: 2px dashed var(--grid); border-radius: 6px;
+  background-color: var(--sheet);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px;
+  transition: border-color .15s;
+}
+.drop.over { border-color: var(--spo2); }
+.drop-inner { background: var(--sheet); padding: 1rem 1.4rem; border-radius: 4px; }
+.drop-title { font-size: 1.3rem; font-weight: 700; margin: 0 0 .5rem; }
+.drop p { margin: 0 0 .9rem; color: var(--ink-soft); }
+.btn {
+  font: inherit; font-weight: 700; cursor: pointer; border-radius: 4px; padding: .6rem 1.1rem;
+  border: 2px solid var(--spo2); background: transparent; color: var(--ink);
+}
+.btn.primary { background: var(--spo2); color: var(--sheet); }
+.btn:focus-visible, input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+fieldset { border: 0; padding: 0; margin: 1.4rem 0 0; }
+legend { font-weight: 700; padding: 0; margin-bottom: .4rem; }
+.choices { display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; }
+.choices label { display: inline-flex; align-items: center; gap: .45rem; cursor: pointer; }
+.choices input { accent-color: var(--spo2); width: 1.05rem; height: 1.05rem; }
+.hint { color: var(--ink-soft); font-size: .95rem; margin: .4rem 0 0; }
+
+#results:empty { display: none; }
+.night { margin-top: 2.6rem; padding-top: 1.6rem; border-top: 2px solid var(--grid); }
+.night h3 { font-size: 1.45rem; margin: 0 0 .2rem; line-height: 1.25; }
+.night .sub { margin: 0 0 1rem; color: var(--ink-soft); }
+.chart { overflow-x: auto; background: var(--sheet); border-radius: 4px; padding: .5rem .25rem; }
+.chart svg { display: block; width: 100%; min-width: 34rem; height: auto; }
+.legend { display: flex; gap: 1.4rem; margin: .5rem 0 0; font-size: .95rem; color: var(--ink-soft); }
+.legend span::before { content: ""; display: inline-block; width: 1.1rem; height: 3px; vertical-align: middle; margin-right: .4rem; background: currentColor; }
+.legend .l-spo2 { color: var(--spo2); }
+.legend .l-pulse { color: var(--pulse); }
+.legend b { color: var(--ink); font-weight: 400; }
+dl.stats { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1.4rem; margin: 1.2rem 0; }
+dl.stats dt { color: var(--ink-soft); }
+dl.stats dd { margin: 0; }
+.note { background: var(--warn-bg); color: var(--ink); border-left: 4px solid var(--warn); padding: .6rem .9rem; margin: 0 0 1rem; border-radius: 2px; }
+.error { border-left-color: var(--pulse); }
+.status { margin: .6rem 0 0; min-height: 1.5em; color: var(--ink-soft); }
+
+.howto { margin-top: 3rem; padding-top: 1.4rem; border-top: 2px solid var(--grid); }
+.howto h3 { font-size: 1.2rem; margin: 0 0 .5rem; }
+.howto ol { margin: 0; padding-left: 1.3rem; max-width: 40rem; }
+.howto li { margin-bottom: .35rem; }
+@media (prefers-reduced-motion: reduce) { .drop { transition: none; } }
+
+.tool { margin-top: 2.8rem; padding-top: 1.6rem; border-top: 3px solid var(--ink); }
+.tool > h2 { font-size: 1.6rem; margin: 0 0 .4rem; line-height: 1.2; }
+.tool > p.intro { margin: 0 0 1.4rem; color: var(--ink-soft); max-width: 38rem; }
+.clock {
+  background-color: var(--sheet);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px;
+  border-radius: 6px; padding: 1.8rem 1rem; text-align: center;
+}
+.clock time { display: inline-block; background: var(--sheet); padding: .2rem 1rem; border-radius: 4px; }
+#now { font-size: clamp(2.8rem, 13vw, 5rem); font-weight: 700; line-height: 1; letter-spacing: .02em; }
+#date { display: block; margin-top: .4rem; color: var(--ink-soft); }
+.actions { margin: 1.4rem 0 0; display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+#clock-status { margin: 1.2rem 0 0; min-height: 1.6em; }
+#clock-status.ok { color: var(--ok); font-weight: 700; }
+#clock-status.bad { color: var(--pulse); font-weight: 700; }
+#clock-detail { margin: .3rem 0 0; color: var(--ink-soft); font-size: .95rem; word-break: break-word; }
+</style>
+</head>
+<body>
+<main>
+  <h1>RS01 tools</h1>
+  <p class="lead">Set the clock of a Contec RS01 sleep apnea screen meter, and turn its recordings into files OSCAR can import. Everything runs in your browser; nothing is sent anywhere.</p>
+
+  <section class="tool" id="clock-tool" aria-labelledby="clock-h">
+    <h2 id="clock-h">Set the clock</h2>
+    <p class="intro">Switch the RS01 on, plug it into this computer with a data USB cable, then press the button. The RS01 gets the time shown below. Needs Chrome or Edge on a computer; the first time, pick “Sleep apnea screen meter” when the browser asks.</p>
+    <div class="clock">
+      <time id="clock"><span id="now">--:--:--</span><span id="date"></span></time>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="set" type="button">Set the RS01 clock</button>
+      <button class="btn" id="test" type="button">Test: set it 2 minutes ahead</button>
+    </div>
+    <p id="clock-status" role="status"></p>
+    <p id="clock-detail"></p>
+  </section>
+
+  <section class="tool" id="oscar-tool" aria-labelledby="oscar-h">
+    <h2 id="oscar-h">Convert nights for OSCAR</h2>
+    <p class="intro">With the RS01 plugged in, its card shows up as a disk. Drop a night’s folder (the .HD file and its .SEG files), or the whole card. Works in any recent browser.</p>
+  <div class="drop" id="drop">
+    <div class="drop-inner">
+      <p class="drop-title">Drop the night’s folder here</p>
+      <p>Several nights at once work too.</p>
+      <label class="btn" for="pick">Choose a folder</label>
+      <input class="sr" type="file" id="pick" webkitdirectory multiple>
+    </div>
+  </div>
+
+  <fieldset>
+    <legend>OSCAR file resolution</legend>
+    <div class="choices">
+      <label><input type="radio" name="interval" value="1" checked> 1&nbsp;s, every reading</label>
+      <label><input type="radio" name="interval" value="2"> 2&nbsp;s</label>
+      <label><input type="radio" name="interval" value="4"> 4&nbsp;s, like an O2Ring</label>
+    </div>
+    <p class="hint">If OSCAR rejects a 1&nbsp;s file, try 4&nbsp;s, the O2Ring’s own rhythm. The spreadsheet file always keeps every second.</p>
+  </fieldset>
+
+  <div id="results" aria-live="polite"></div>
+
+  <section class="howto">
+    <h3>Importing into OSCAR</h3>
+    <ol>
+      <li>Open the downloaded .zip archive (double-click on a Mac).</li>
+      <li>In OSCAR, choose File › Import › Viatom/Wellue.</li>
+      <li>Select the file named after the date and time, with no extension (for example 20261102052830). The .csv file is only for a spreadsheet.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+(() => {
+  const VID = 0x28E9, PID = 0x01F3, SIZE = 64;
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, "0");
+  const hex = a => Array.from(a, b => b.toString(16).padStart(2, "0")).join(" ");
+  const dateFmt = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  function tick() {
+    const d = new Date();
+    $("now").textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    $("date").textContent = dateFmt.format(d);
+    setTimeout(tick, 1000 - d.getMilliseconds() + 5);
+  }
+  tick();
+
+  function status(text, kind = "", detail = "") {
+    $("clock-status").textContent = text; $("clock-status").className = kind; $("clock-detail").textContent = detail;
+  }
+
+  if (!("hid" in navigator)) {
+    status("This browser can’t talk to USB HID devices.", "bad",
+      "Open this page in Chrome or Edge on a computer, directly in a tab (not inside another site or app). The converter below still works here.");
+    $("set").disabled = $("test").disabled = true;
+    return;
+  }
+
+  // Command found in ResMon Plus 3.0.2.2: 83 YY MM DD hh mm ss 00 00 CS, CS = sum & 0x7F; reply F3 00 73.
+  function packet(t) {
+    const body = [0x83, (t.getFullYear() - 2000) & 0x7f, (t.getMonth() + 1) & 0x0f, t.getDate() & 0x1f,
+                  t.getHours() & 0x1f, t.getMinutes() & 0x3f, t.getSeconds() & 0x3f, 0, 0];
+    body.push(body.reduce((a, b) => a + b, 0) & 0x7f);
+    const out = new Uint8Array(SIZE); out.set(body);
+    return out;
+  }
+
+  async function getDevice() {
+    const known = (await navigator.hid.getDevices()).filter(d => d.vendorId === VID && d.productId === PID);
+    if (known.length) return known[0];
+    const picked = await navigator.hid.requestDevice({ filters: [{ vendorId: VID, productId: PID }] });
+    return picked[0] || null;
+  }
+
+  async function setClock(offsetSeconds) {
+    $("set").disabled = $("test").disabled = true;
+    let device = null;
+    try {
+      status("Looking for the RS01…");
+      device = await getDevice();
+      if (!device) { status("No device selected.", "bad", "Press the button again and pick “Sleep apnea screen meter”."); return; }
+      if (!device.opened) await device.open();
+
+      const reply = new Promise(resolve => {
+        const onReport = e => { device.removeEventListener("inputreport", onReport); resolve(new Uint8Array(e.data.buffer, e.data.byteOffset, e.data.byteLength)); };
+        device.addEventListener("inputreport", onReport);
+        setTimeout(() => { device.removeEventListener("inputreport", onReport); resolve(null); }, 2500);
+      });
+
+      status("Waiting for the next whole second…");
+      await new Promise(r => setTimeout(r, 1000 - new Date().getMilliseconds() + 2));
+      const t = new Date(Date.now() + offsetSeconds * 1000);
+      t.setMilliseconds(0);
+      const pkt = packet(t);
+      await device.sendReport(0, pkt);
+      const sent = `${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
+
+      const r = await reply;
+      if (r && r[0] === 0xf3 && r[1] === 0x00 && r[2] === 0x73) {
+        status(offsetSeconds ? `Test done: the RS01 should now read ${sent}, 2 minutes ahead.` : `Done. RS01 clock set to ${sent}.`, "ok",
+          offsetSeconds ? "If its screen jumped ahead, everything works: press “Set the RS01 clock” to put it back on time." : "Check the time on the RS01 screen.");
+      } else if (r) {
+        status("The RS01 answered, but not with the expected confirmation.", "bad",
+          `Sent ${hex(pkt.slice(0, 10))}, received ${hex(r.slice(0, 8))}. Check its screen; don’t keep retrying.`);
+      } else {
+        status("No answer from the RS01.", "bad", `Sent ${hex(pkt.slice(0, 10))}. Check its screen; don’t keep retrying.`);
+      }
+    } catch (err) {
+      const msg = err && err.name === "NotFoundError" ? "No device selected."
+        : err && err.name === "SecurityError" ? "This page isn’t allowed to use USB devices here."
+        : "Couldn’t talk to the RS01.";
+      status(msg, "bad", err && err.name === "NotFoundError" ? "Press the button again and pick “Sleep apnea screen meter”."
+        : `${err && err.message ? err.message : err}. Quit other programs using the RS01, unplug it, plug it back in and try again.`);
+    } finally {
+      if (device && device.opened) { try { await device.close(); } catch (e) {} }
+      $("set").disabled = $("test").disabled = false;
+    }
+  }
+
+  $("set").addEventListener("click", () => setClock(0));
+  $("test").addEventListener("click", () => setClock(120));
+})();
+</script>
+<script>
+(() => {
+  const RECORD = 206, SEG_HEADER = 512;
+  const dlPromise = (window.claude && typeof window.claude.use === "function")
+    ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const results = $("#results");
+  const fmtDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const pad = (n, w = 2) => String(n).padStart(w, "0");
+  const hhmm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const hhmmss = d => `${hhmm(d)}:${pad(d.getSeconds())}`;
+  const addS = (d, s) => new Date(d.getTime() + s * 1000);
+  const num = (x, dec = 1) => x.toLocaleString("en-GB", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  function dur(s) {
+    if (s < 60) return `${s} s`;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h ? `${h} h ${pad(m)}` : `${m} min`;
+  }
+  function esc(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
+  /* ---------- Reading dropped folders ---------- */
+  async function walk(entry, out) {
+    if (entry.isFile) {
+      const file = await new Promise((res, rej) => entry.file(res, rej));
+      out.push({ path: entry.fullPath, file });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      for (;;) {
+        const batch = await new Promise((res, rej) => reader.readEntries(res, rej));
+        if (!batch.length) break;
+        for (const e of batch) await walk(e, out);
+      }
+    }
+  }
+
+  const drop = $("#drop");
+  ["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "dragend"].forEach(t => drop.addEventListener(t, () => drop.classList.remove("over")));
+  drop.addEventListener("drop", async e => {
+    e.preventDefault(); drop.classList.remove("over");
+    const out = [];
+    const entries = [...(e.dataTransfer.items || [])]
+      .map(i => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean);
+    try {
+      if (entries.length) { for (const en of entries) await walk(en, out); }
+      else for (const f of e.dataTransfer.files) out.push({ path: "/" + f.name, file: f });
+    } catch (err) { showError("The dropped items could not be read. Try the “Choose a folder” button instead."); return; }
+    handle(out);
+  });
+  $("#pick").addEventListener("change", e => {
+    const out = [...e.target.files].map(f => ({ path: "/" + (f.webkitRelativePath || f.name), file: f }));
+    e.target.value = "";
+    handle(out);
+  });
+
+  /* ---------- RS01 format ---------- */
+  function field(b, o, w) { return new TextDecoder("latin1").decode(b.subarray(o, o + w)).trim(); }
+  function parseHD(buf) {
+    const b = new Uint8Array(buf);
+    if (b.length < 0x16a) throw new Error("the .HD file is too short.");
+    const s = field(b, 0x16, 14);
+    if (!/^\d{14}$/.test(s)) throw new Error("unreadable start time in the .HD file.");
+    const start = new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(8, 10), +s.slice(10, 12), +s.slice(12, 14));
+    const perSeg = parseInt(field(b, 0x78, 4), 10) || 600;
+    const n = parseInt(field(b, 0x88, 2), 10);
+    const labels = [], rates = [], sizes = [];
+    for (let i = 0; i < n; i++) labels.push(field(b, 0x8a + 8 * i, 8));
+    const base = 0x8a + 8 * n;
+    for (let i = 0; i < n; i++) rates.push(parseInt(field(b, base + 4 * i, 4), 10));
+    for (let i = 0; i < n; i++) sizes.push(parseInt(field(b, base + 4 * n + 4 * i, 4), 10));
+    if (labels.join() !== "Flow,PR,SpO2,Pleth" || rates.join() !== "50,1,1,100" || sizes.join() !== "2,1,1,1")
+      throw new Error(`unexpected signal layout (${labels.join(", ")}).`);
+    return { start, perSeg };
+  }
+  const segNum = name => parseInt(name, 10) || 1;
+
+  function parseSegs(segs, perSeg) {
+    segs.sort((a, b) => segNum(a.name) - segNum(b.name));
+    const parts = []; let maxIdx = -1, fmin = Infinity, fmax = -Infinity; const notes = [];
+    for (const s of segs) {
+      const body = new Uint8Array(s.buf).subarray(SEG_HEADER);
+      const count = Math.floor(body.length / RECORD);
+      if (!count) continue;
+      const dv = new DataView(body.buffer, body.byteOffset, body.byteLength);
+      const n = segNum(s.name);
+      const first = dv.getUint16(2, true);
+      const off = first > (n - 1) * perSeg ? 0 : (n - 1) * perSeg;
+      for (let i = 0; i < count; i++) {
+        const p = i * RECORD;
+        if (body[p] !== 0xff || body[p + 1] !== 0xff) { notes.push(`${s.name}: data misaligned from second ${i}; the rest of the file was skipped.`); break; }
+        const idx = dv.getUint16(p + 2, true) + off - 1;
+        if (idx < 0) continue;
+        parts.push(idx, body[p + 105], body[p + 104]);
+        if (idx > maxIdx) maxIdx = idx;
+        for (let k = 0; k < 50; k++) { const f = dv.getUint16(p + 4 + 2 * k, true); if (f < fmin) fmin = f; if (f > fmax) fmax = f; }
+      }
+    }
+    const spo2 = new Int16Array(maxIdx + 1).fill(-1), pr = new Int16Array(maxIdx + 1).fill(-1);
+    for (let j = 0; j < parts.length; j += 3) { spo2[parts[j]] = parts[j + 1]; pr[parts[j]] = parts[j + 2]; }
+    return { spo2, pr, recorded: parts.length / 3, fmin, fmax, notes };
+  }
+
+  /* ---------- Grouping and analysis ---------- */
+  async function handle(items) {
+    items = items.filter(i => !i.file.name.startsWith("._"));
+    const dirs = new Map();
+    for (const it of items) {
+      const dir = it.path.slice(0, it.path.lastIndexOf("/")) || "/";
+      if (!dirs.has(dir)) dirs.set(dir, { hd: [], seg: [] });
+      const ext = it.file.name.split(".").pop().toUpperCase();
+      if (ext === "HD") dirs.get(dir).hd.push(it.file);
+      else if (ext === "SEG") dirs.get(dir).seg.push(it.file);
+    }
+    results.textContent = "";
+    let found = 0;
+    for (const [dir, g] of [...dirs].sort()) {
+      if (!g.hd.length) continue;
+      found++;
+      if (g.hd.length > 1) {
+        showError(`The folder ${dir} contains several .HD files (${g.hd.map(f => f.name).join(", ")}). Put each night, with its .SEG files, in its own folder.`);
+        continue;
+      }
+      try {
+        const { start, perSeg } = parseHD(await g.hd[0].arrayBuffer());
+        if (!g.seg.length) throw new Error("no .SEG file next to the .HD file.");
+        const segs = await Promise.all(g.seg.map(async f => ({ name: f.name, buf: await f.arrayBuffer() })));
+        renderNight(analyse(start, parseSegs(segs, perSeg), g.hd[0].name));
+      } catch (err) {
+        showError(`${g.hd[0].name}: ${err.message}`);
+      }
+    }
+    if (!found) showError("No .HD file found. Drop the folder that contains the night’s .HD file and .SEG files.");
+  }
+
+  function analyse(start, d, hdName) {
+    const { spo2, pr } = d;
+    const ok = i => spo2[i] >= 50 && spo2[i] <= 100 && pr[i] >= 20 && pr[i] <= 250;
+    let first = -1, last = -1, nv = 0, sSum = 0, sMin = 101, below90 = 0, pSum = 0, pMin = 999, pMax = 0;
+    for (let i = 0; i < spo2.length; i++) {
+      if (!ok(i)) continue;
+      if (first < 0) first = i; last = i; nv++;
+      sSum += spo2[i]; if (spo2[i] < sMin) sMin = spo2[i]; if (spo2[i] < 90) below90++;
+      pSum += pr[i]; if (pr[i] < pMin) pMin = pr[i]; if (pr[i] > pMax) pMax = pr[i];
+    }
+    return { start, hdName, ...d, ok, first, last, nv, sMean: sSum / nv, sMin, below90, pMean: pSum / nv, pMin, pMax };
+  }
+
+  /* ---------- Chart ---------- */
+  function chart(n) {
+    const W = 800, L = 44, R = 10, plotW = W - L - R;
+    const S = { top: 12, h: 140, lo: 70, hi: 100 }, P = { top: 178, h: 90, lo: 40, hi: 140 };
+    const H = P.top + P.h + 26;
+    const span = n.last - n.first + 1;
+    const bin = Math.max(1, Math.ceil(span / plotW));
+    const x = i => L + ((i - n.first) / Math.max(1, span - 1)) * plotW;
+    const y = (p, v) => p.top + p.h - ((Math.min(p.hi, Math.max(p.lo, v)) - p.lo) / (p.hi - p.lo)) * p.h;
+    let sPath = "", pPath = "", sPen = false, pPen = false;
+    for (let b = n.first; b <= n.last; b += bin) {
+      let sMin = 999, pS = 0, c = 0;
+      for (let i = b; i < Math.min(b + bin, n.last + 1); i++) if (n.ok(i)) { if (n.spo2[i] < sMin) sMin = n.spo2[i]; pS += n.pr[i]; c++; }
+      const xx = x(b + (Math.min(bin, n.last + 1 - b) - 1) / 2).toFixed(1);
+      if (c) {
+        sPath += `${sPen ? "L" : "M"}${xx} ${y(S, sMin).toFixed(1)}`; sPen = true;
+        pPath += `${pPen ? "L" : "M"}${xx} ${y(P, pS / c).toFixed(1)}`; pPen = true;
+      } else { sPen = pPen = false; }
+    }
+    let grid = "";
+    for (const v of [70, 80, 90, 100]) grid += `<line x1="${L}" x2="${W - R}" y1="${y(S, v)}" y2="${y(S, v)}" stroke="var(--grid)" ${v === 90 ? 'stroke-dasharray="4 4"' : ""}/><text x="${L - 6}" y="${y(S, v) + 4}" text-anchor="end">${v}</text>`;
+    for (const v of [40, 90, 140]) grid += `<line x1="${L}" x2="${W - R}" y1="${y(P, v)}" y2="${y(P, v)}" stroke="var(--grid)"/><text x="${L - 6}" y="${y(P, v) + 4}" text-anchor="end">${v}</text>`;
+    const t0 = addS(n.start, n.first);
+    const step = span > 4 * 3600 ? 3600 : span > 3600 ? 1800 : span > 600 ? 300 : 60;
+    let tick = Math.ceil((t0.getTime() / 1000 - t0.getTimezoneOffset() * 60) / step) * step - (t0.getTime() / 1000 - t0.getTimezoneOffset() * 60);
+    for (; tick < span; tick += step) {
+      const xx = x(n.first + tick);
+      grid += `<line x1="${xx}" x2="${xx}" y1="${S.top}" y2="${P.top + P.h}" stroke="var(--grid)" stroke-width=".6"/><text x="${xx}" y="${H - 8}" text-anchor="middle">${hhmm(addS(t0, tick))}</text>`;
+    }
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="SpO2 and pulse over the recording" font-size="12" fill="var(--ink-soft)" font-family="inherit">
+      ${grid}
+      <path d="${sPath}" fill="none" stroke="var(--spo2)" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="${pPath}" fill="none" stroke="var(--pulse)" stroke-width="1.4" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  /* ---------- Rendering ---------- */
+  function showError(msg) {
+    const p = document.createElement("p"); p.className = "note error"; p.textContent = msg;
+    const sec = document.createElement("section"); sec.className = "night"; sec.appendChild(p);
+    results.appendChild(sec);
+  }
+
+  function renderNight(n) {
+    const sec = document.createElement("section"); sec.className = "night";
+    const recEnd = addS(n.start, n.spo2.length);
+    let html = `<h3>${esc(fmtDate.format(n.start))}, from ${hhmm(n.start)}</h3>
+      <p class="sub">${esc(n.hdName)} · ${dur(n.recorded)} recorded, until ${hhmm(recEnd)}</p>`;
+    for (const t of n.notes) html += `<p class="note">${esc(t)}</p>`;
+    if (n.nv === 0) {
+      html += `<p class="note">No valid SpO2 reading in this recording (finger sensor misplaced or not connected). Nothing to import.</p>`;
+      sec.innerHTML = html; results.appendChild(sec); return;
+    }
+    if (n.fmax - n.fmin < 5)
+      html += `<p class="note">The nasal airflow stays constant for the whole recording, so the cannula was probably not connected. This signal is not imported into OSCAR anyway.</p>`;
+    const vStart = addS(n.start, n.first), vEnd = addS(n.start, n.last);
+    html += `<div class="chart">${chart(n)}</div>
+      <p class="legend"><span class="l-spo2"><b>SpO2 (%), minimum per point</b></span><span class="l-pulse"><b>Pulse (bpm)</b></span></p>
+      <dl class="stats">
+        <dt>Valid readings</dt><dd>${dur(n.nv)}, from ${hhmmss(vStart)} to ${hhmmss(vEnd)}</dd>
+        <dt>SpO2</dt><dd>mean ${num(n.sMean)}%, minimum ${n.sMin}%</dd>
+        <dt>Time below 90%</dt><dd>${n.below90 < 60 ? n.below90 + " s" : dur(n.below90)} (${num(100 * n.below90 / n.nv)}% of measured time)</dd>
+        <dt>Pulse</dt><dd>mean ${Math.round(n.pMean)}, range ${n.pMin} to ${n.pMax}&nbsp;bpm</dd>
+      </dl>
+      <button class="btn primary" type="button">Download for OSCAR (.zip)</button>
+      <p class="status" role="status"></p>`;
+    sec.innerHTML = html;
+    const btn = $("button", sec), status = $(".status", sec);
+    btn.addEventListener("click", () => download(n, btn, status));
+    results.appendChild(sec);
+  }
+
+  /* ---------- Output files ---------- */
+  const stamp = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+
+  function viatom(n, interval) {
+    const a = n.first - (n.first % interval);
+    const count = Math.ceil((n.last + 1 - a) / interval);
+    const out = new Uint8Array(40 + 5 * count);
+    const dv = new DataView(out.buffer);
+    const t0 = addS(n.start, a);
+    dv.setUint16(0, 3, true); dv.setUint16(2, t0.getFullYear(), true);
+    out[4] = t0.getMonth() + 1; out[5] = t0.getDate(); out[6] = t0.getHours(); out[7] = t0.getMinutes(); out[8] = t0.getSeconds();
+    dv.setUint32(9, out.length, true); dv.setUint16(13, Math.min(65535, count * interval), true);
+    for (let r = 0; r < count; r++) {
+      let s = 0, p = 0, c = 0;
+      for (let i = a + r * interval; i < a + (r + 1) * interval; i++) if (i < n.spo2.length && n.ok(i)) { s += n.spo2[i]; p += n.pr[i]; c++; }
+      const o = 40 + 5 * r;
+      if (c) { out[o] = Math.round(s / c); out[o + 1] = Math.round(p / c); }
+      else { out[o] = 0xff; out[o + 1] = 0xff; out[o + 2] = 1; }
+    }
+    return { name: stamp(t0), data: out };
+  }
+
+  function csv(n) {
+    const lines = ["time,spo2,pulse"];
+    for (let i = n.first; i <= n.last; i++) {
+      const d = addS(n.start, i);
+      const t = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hhmmss(d)}`;
+      lines.push(n.ok(i) ? `${t},${n.spo2[i]},${n.pr[i]}` : `${t},,`);
+    }
+    return new TextEncoder().encode(lines.join("\r\n") + "\r\n");
+  }
+
+  const CRC = (() => { const t = new Uint32Array(256); for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; } return t; })();
+  function crc32(u8) { let c = 0xffffffff; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+
+  function zip(files, date) {
+    const dosT = (date.getHours() << 11) | (date.getMinutes() << 5) | (date.getSeconds() >> 1);
+    const dosD = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+    const enc = new TextEncoder(), chunks = [], central = [];
+    let offset = 0;
+    for (const f of files) {
+      const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+      const h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+      h.setUint16(10, dosT, true); h.setUint16(12, dosD, true); h.setUint32(14, crc, true);
+      h.setUint32(18, size, true); h.setUint32(22, size, true); h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+      chunks.push(new Uint8Array(h.buffer), name, f.data);
+      const c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+      c.setUint16(12, dosT, true); c.setUint16(14, dosD, true); c.setUint32(16, crc, true); c.setUint32(20, size, true); c.setUint32(24, size, true);
+      c.setUint16(28, name.length, true); c.setUint32(42, offset, true);
+      central.push(new Uint8Array(c.buffer), name);
+      offset += 30 + name.length + size;
+    }
+    const cSize = central.reduce((s, u) => s + u.length, 0);
+    const e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+    e.setUint32(12, cSize, true); e.setUint32(16, offset, true);
+    return new Blob([...chunks, ...central, new Uint8Array(e.buffer)], { type: "application/zip" });
+  }
+
+  async function download(n, btn, status) {
+    const interval = +document.querySelector('input[name="interval"]:checked').value;
+    const v = viatom(n, interval);
+    const blob = zip([{ name: v.name, data: v.data }, { name: v.name + ".csv", data: csv(n) }], n.start);
+    const filename = `RS01_${v.name.slice(0, 8)}_${v.name.slice(8, 12)}.zip`;
+    btn.disabled = true; status.textContent = "Preparing the file…";
+    try {
+      const dl = await dlPromise;
+      if (dl) {
+        await dl.save({ filename, data: blob });
+        status.textContent = `${filename} saved (${interval} s resolution).`;
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        status.textContent = `${filename} offered for download.`;
+      }
+    } catch (err) {
+      status.textContent = err && err.code === "declined" ? "Download cancelled."
+        : `The download is not available here (${(err && err.code) || "error"}).`;
+    } finally { btn.disabled = false; }
+  }
+})();
+</script>
+</body>
+</html>
