@@ -1,6 +1,10 @@
 # RS01 tools
 
-Unofficial browser tools for the **Contec RS01** sleep apnea screen meter (USB name “Sleep apnea screen meter”, USB ID `28E9:01F3`), in a single page, [index.html](index.html):
+Unofficial browser tools for the **Contec RS01** sleep apnea screen meter (USB name “Sleep apnea screen meter”, USB ID `28E9:01F3`), in a single page.
+
+**Open the tools: [mrbluematrix.github.io/contecRS01_2_oscar](https://mrbluematrix.github.io/contecRS01_2_oscar/)**
+
+The page offers:
 
 - **Set the clock**: sets the device’s clock from your computer, over USB.
 - **Convert nights for OSCAR**: reads a night’s recording from the RS01’s card, shows SpO2 and pulse, and converts it into a file [OSCAR](https://www.sleepfiles.com/OSCAR/) can import.
@@ -11,7 +15,7 @@ Everything runs in your browser. Nothing is uploaded anywhere.
 
 ## Set the RS01 clock
 
-1. Open [index.html](index.html) in **Chrome or Edge** on a computer. Safari and Firefox don’t support USB HID devices (WebHID).
+1. Open [the tools page](https://mrbluematrix.github.io/contecRS01_2_oscar/) in **Chrome or Edge** on a computer. Safari and Firefox don’t support USB HID devices (WebHID).
 2. Switch the RS01 on and plug it in with a USB cable that carries data (charge-only cables won’t work).
 3. Press **Set the RS01 clock**. The first time, Chrome asks which device to allow: pick “Sleep apnea screen meter”.
 
@@ -21,7 +25,7 @@ WebHID only works when the page is served over HTTPS (or opened as a local file)
 
 ## Convert nights for OSCAR
 
-1. Open [index.html](index.html) in any recent browser (this part doesn’t need Chrome).
+1. Open [the tools page](https://mrbluematrix.github.io/contecRS01_2_oscar/) in any recent browser (this part doesn’t need Chrome).
 2. Plug in the RS01: its card shows up as a disk. Drop a night’s folder (the `.HD` file and its `.SEG` files) onto the page, or the whole card to see every night.
 3. For each night, press **Download for OSCAR (.zip)** and unzip it.
 4. In OSCAR, choose **File › Import › Viatom/Wellue** and select the file named after the date and time, with no extension (for example `20261102052830`).
@@ -33,9 +37,9 @@ Limits:
 - OSCAR has no RS01 importer, so nights are converted to the Viatom/Wellue (O2Ring) oximetry format. Only **SpO2 and pulse** are imported; the nasal airflow and the pleth wave are not.
 - The default resolution is one point per second, every reading the RS01 took. If your OSCAR version rejects the file, choose 4 s, the O2Ring’s own rhythm (each point is then the mean of a 4-second window).
 
-## Publishing on GitHub Pages
+## Running your own copy
 
-Put the files in a repository, then in **Settings › Pages** choose “Deploy from a branch”, branch `main`, folder `/ (root)`. After a minute the tools are at `https://<your-name>.github.io/<repository>/`.
+The tools are a single file, `index.html`. You can also download it and open it locally in Chrome or Edge, or host it on your own GitHub Pages: fork this repository, then in **Settings › Pages** choose “Deploy from a branch”, branch `main`, folder `/ (root)`.
 
 ## Python versions
 
